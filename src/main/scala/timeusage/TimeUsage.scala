@@ -89,7 +89,21 @@ object TimeUsage {
     *    “t10”, “t12”, “t13”, “t14”, “t15”, “t16” and “t18” (those which are not part of the previous groups only).
     */
   def classifiedColumns(columnNames: List[String]): (List[Column], List[Column], List[Column]) = {
-    ???
+    var primaryNeeds:List[Column] = Nil
+    var work:List[Column] = Nil
+    var leisure:List[Column] = Nil
+
+    val primaryNeedsRegex = """t(01)|(03)|(11)|(1801)|(1803).*""".r
+    val workRegex = """t(05)|(1805).*""".r
+
+    columnNames.foreach(column =>
+      column match {
+        case primaryNeedsRegex() => primaryNeeds = new Column(column) :: primaryNeeds
+        case workRegex() => work = new Column(column) :: work
+        case _ => leisure = new Column(column) :: leisure
+      })
+
+    (primaryNeeds, work, leisure)
   }
 
   /** @return a projection of the initial DataFrame such that all columns containing hours spent on primary needs

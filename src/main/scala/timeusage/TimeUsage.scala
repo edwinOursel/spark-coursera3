@@ -3,6 +3,7 @@ package timeusage
 import java.nio.file.Paths
 
 import org.apache.spark.sql._
+import org.apache.spark.sql.expressions.javalang.typed
 import org.apache.spark.sql.functions.column
 import org.apache.spark.sql.types._
 
@@ -31,7 +32,7 @@ object TimeUsage {
     val (columns, initDf) = read("/timeusage/atussum.csv")
     val (primaryNeedsColumns, workColumns, otherColumns) = classifiedColumns(columns)
     val summaryDf = timeUsageSummary(primaryNeedsColumns, workColumns, otherColumns, initDf)
-    val finalDf = timeUsageGrouped(summaryDf)
+    val finalDf = timeUsageGroupedTyped(timeUsageSummaryTyped(summaryDf))
     finalDf.show()
   }
 
@@ -166,7 +167,7 @@ object TimeUsage {
         .as("sex")
 
     val ageProjection: Column =
-      when($"teage" >= 15 && $"teage" <= 22, "youg")
+      when($"teage" >= 15 && $"teage" <= 22, "young")
         .when($"teage" > 22 && $"teage" <= 55, "active")
         .otherwise("elder")
         .as("age")
@@ -207,12 +208,11 @@ object TimeUsage {
     * Finally, the resulting DataFrame should be sorted by working status, sex and age.
     */
   def timeUsageGrouped(summed: DataFrame): DataFrame = {
-    val df = summed.groupBy("working", "sex", "age").
+    summed.groupBy("working", "sex", "age").
       agg(round(avg($"primaryNeeds"), 1).as("primaryNeeds"),
           round(avg($"work"), 1).as("work"),
-          round(avg($"other"), 1).as("other"))
-    df.show(30)
-    df
+          round(avg($"other"), 1).as("other")).
+      orderBy($"working", $"sex", $"age")
   }
 
   /**
@@ -229,7 +229,11 @@ object TimeUsage {
     * @param viewName Name of the SQL view to use
     */
   def timeUsageGroupedSqlQuery(viewName: String): String =
-    ???
+    "SELECT working, sex, age, " +
+      "ROUND(AVG(primaryNeeds), 1) as primaryNeeds, ROUND(AVG(work), 1) as work, ROUND(AVG(other), 1) as other " +
+      "FROM " + viewName +
+      " GROUP BY working, sex, age" +
+      " ORDER BY working, sex, age"
 
   /**
     * @return A `Dataset[TimeUsageRow]` from the “untyped” `DataFrame`
@@ -239,7 +243,7 @@ object TimeUsage {
     * cast them at the same time.
     */
   def timeUsageSummaryTyped(timeUsageSummaryDf: DataFrame): Dataset[TimeUsageRow] =
-    ???
+    timeUsageSummaryDf.as[TimeUsageRow]
 
   /**
     * @return Same as `timeUsageGrouped`, but using the typed API when possible
@@ -253,7 +257,13 @@ object TimeUsage {
     * Hint: you should use the `groupByKey` and `typed.avg` methods.
     */
   def timeUsageGroupedTyped(summed: Dataset[TimeUsageRow]): Dataset[TimeUsageRow] = {
-    ???
+    summed.groupByKey(row => (row.working, row.sex, row.age)).
+      agg(round(avg($"primaryNeeds"), 1).as("primaryNeeds").as[Double],
+          round(avg($"work"), 1).as("work").as[Double],
+          round(avg($"other"), 1).as("other").as[Double]).
+      select(($"key._1").as("working"), ($"key._2").as("sex"), ($"key._3").as("age"),
+        $"primaryNeeds", $"work", $"other").as[TimeUsageRow].
+      orderBy($"working", $"sex", $"age")
   }
 }
 

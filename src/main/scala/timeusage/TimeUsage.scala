@@ -3,6 +3,7 @@ package timeusage
 import java.nio.file.Paths
 
 import org.apache.spark.sql._
+import org.apache.spark.sql.functions.column
 import org.apache.spark.sql.types._
 
 /** Main class */
@@ -93,14 +94,22 @@ object TimeUsage {
     var work:List[Column] = Nil
     var leisure:List[Column] = Nil
 
-    val primaryNeedsRegex = """t(01)|(03)|(11)|(1801)|(1803).*""".r
-    val workRegex = """t(05)|(1805).*""".r
+    val primaryNeedsRegex = """(t01)|(t03)|(t11)|(t1801)|(t1803).*""".r
+    val workRegex = """(t05)|(t1805).*""".r
+    val otherRegex = """(t02)|(t04)|(t06)|(t07)|(t08)|(t09)|(t10)|(t12)|(t13)|(t14)|(t15)|(t16)|(t18)""".r
 
     columnNames.foreach(column =>
-      column match {
-        case primaryNeedsRegex() => primaryNeeds = new Column(column) :: primaryNeeds
-        case workRegex() => work = new Column(column) :: work
-        case _ => leisure = new Column(column) :: leisure
+      primaryNeedsRegex.findFirstIn(column) match {
+        case Some(_) => primaryNeeds = new Column(column) :: primaryNeeds
+        case None =>
+          workRegex.findFirstIn(column) match {
+            case Some(_) => work = new Column(column) :: work
+            case None =>
+              otherRegex.findFirstIn(column) match {
+                case Some(_) => leisure = new Column(column) :: leisure
+                case None => //nothing...
+              }
+          }
       })
 
     (primaryNeeds, work, leisure)
@@ -198,7 +207,12 @@ object TimeUsage {
     * Finally, the resulting DataFrame should be sorted by working status, sex and age.
     */
   def timeUsageGrouped(summed: DataFrame): DataFrame = {
-    ???
+    val df = summed.groupBy("working", "sex", "age").
+      agg(round(avg($"primaryNeeds"), 1).as("primaryNeeds"),
+          round(avg($"work"), 1).as("work"),
+          round(avg($"other"), 1).as("other"))
+    df.show(30)
+    df
   }
 
   /**
@@ -239,7 +253,6 @@ object TimeUsage {
     * Hint: you should use the `groupByKey` and `typed.avg` methods.
     */
   def timeUsageGroupedTyped(summed: Dataset[TimeUsageRow]): Dataset[TimeUsageRow] = {
-    import org.apache.spark.sql.expressions.scalalang.typed
     ???
   }
 }

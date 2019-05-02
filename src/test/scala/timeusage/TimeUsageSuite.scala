@@ -21,7 +21,7 @@ class TimeUsageSuite extends FunSuite with BeforeAndAfterAll {
   //classifiedColumns
   test("shouldClassifyPrimaryNeeds") {
     //GIVEN
-    val columns = List("t500103", "t01", "t03", "t11", "t999", "t1801", "t1803999", "t05", "t1805")
+    val columns = List("t500103", "t01", "t03", "t11", "t999", "t1801", "t1803999", "t05", "t1805", "t02", "t061234")
 
     //WHEN
     val (primaryColumns, workColumns, otherColumns) = testObject.classifiedColumns(columns)
